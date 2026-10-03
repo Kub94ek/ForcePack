@@ -88,6 +88,6 @@ public enum Translations {
             }
         }
 
-        defaultConfig = YamlConfiguration.loadConfiguration(new File(plugin.getDataFolder() + "/lang/en_GB.yml"));
+        defaultConfig = YamlConfiguration.loadConfiguration(new File(plugin.getDataFolder() + "/lang/en_gb.yml"));
     }
 }
