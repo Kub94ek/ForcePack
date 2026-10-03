@@ -60,6 +60,7 @@ public final class ForcePackPaper extends JavaPlugin implements ForcePackPlatfor
     private PlatformScheduler<?> scheduler;
     private final Map<ResourcePackVersion, Set<ResourcePack>> resourcePacks = new HashMap<>();
     public boolean velocityMode;
+    public ResourcePackListener resourcePackListener;
 
     private BukkitAudiences adventure;
 
@@ -367,7 +368,8 @@ public final class ForcePackPaper extends JavaPlugin implements ForcePackPlatfor
             getLogger().info("Enabled velocity listener");
         }
 
-        pm.registerEvents(new ResourcePackListener(this), this);
+        resourcePackListener = new ResourcePackListener(this);
+        pm.registerEvents(resourcePackListener, this);
         pm.registerEvents(new ExemptionListener(this), this);
 
         PacketEvents.getAPI().getEventManager().registerListeners(new PacketListener(this));

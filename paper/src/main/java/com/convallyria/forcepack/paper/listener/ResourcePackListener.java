@@ -9,12 +9,15 @@ import com.convallyria.forcepack.api.utils.GeyserUtil;
 import com.convallyria.forcepack.paper.ForcePackPaper;
 import com.convallyria.forcepack.paper.event.ForcePackReloadEvent;
 import com.convallyria.forcepack.paper.event.MultiVersionResourcePackStatusEvent;
+import com.convallyria.forcepack.paper.event.ResourcePackLoadedEvent;
 import com.convallyria.forcepack.paper.player.ForcePackPaperPlayer;
 import com.convallyria.forcepack.paper.translation.Translations;
 import com.convallyria.forcepack.paper.util.GameProfile;
 import com.convallyria.forcepack.paper.util.ProtocolUtil;
 import com.github.retrooper.packetevents.PacketEvents;
 import com.github.retrooper.packetevents.manager.server.ServerVersion;
+import com.google.common.hash.Hashing;
+import com.google.common.io.Files;
 import net.kyori.adventure.resource.ResourcePackStatus;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.JoinConfiguration;
@@ -28,6 +31,8 @@ import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.event.player.PlayerResourcePackStatusEvent;
 
+import java.io.File;
+import java.io.IOException;
 import java.lang.reflect.Constructor;
 import java.util.Map;
 import java.util.Set;
@@ -40,6 +45,16 @@ public class ResourcePackListener implements Listener {
     private final ForcePackPaper plugin;
 
     private final Map<UUID, Long> sentAccept = new ConcurrentHashMap<>();
+    private String defaultPackHash;
+    {
+        try {
+            defaultPackHash = Files.asByteSource(new File(
+                    "/data/plugins/ForcePack/packs/pack.zip"
+                )).hash(Hashing.sha1()).toString();
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
 
     public ResourcePackListener(final ForcePackPaper plugin) {
         this.plugin = plugin;
@@ -134,6 +149,7 @@ public class ResourcePackListener implements Listener {
                 } else {
                     ensureMainThread(() -> forcePackPlayer.player().ifPresent(player -> {
                         Translations.ACCEPTED.send(player);
+                        Bukkit.getPluginManager().callEvent(new ResourcePackLoadedEvent(profile, packId));
                         boolean sendTitle = plugin.getConfig().getBoolean("send-loading-title");
                         if (sendTitle) player.sendTitle(null, null, 0, 0, 0); // resetTitle doesn't clear subtitle
                     }));
@@ -257,20 +273,26 @@ public class ResourcePackListener implements Listener {
             return;
         }
 
-        plugin.addToWaiting(uuid, packs);
+        ResourcePack pack = packs.stream().filter(
+                (resourcePack) -> {
+                    plugin.log("Resourcepack Hash: " + resourcePack.getHash());
+                    plugin.log("Default pack Hash: " + defaultPackHash);
+                    return resourcePack.getHash().equalsIgnoreCase(defaultPackHash);
+                }
+        ).findFirst().get();
+        plugin.addToWaiting(uuid, Set.of(pack));
 
-        for (ResourcePack pack : packs) {
-            plugin.log("Sending pack " + pack.getUUID() + " to player " + player.getName());
-            final int version = ProtocolUtil.getProtocolVersion(uuid);
-            final int maxSize = ClientVersion.getMaxSizeForVersion(version);
-            final boolean forceSend = getConfig().getBoolean("Server.force-invalid-size");
-            if (!forceSend && pack.getSize() > maxSize) {
-                if (plugin.debug()) plugin.getLogger().info(String.format("Not sending pack to %s because of excessive size for version %d (%dMB, %dMB).", player.getName(), version, pack.getSize(), maxSize));
-                continue;
-            }
-
-            plugin.getScheduler().executeOnMain(() -> this.runSetPackTask(player, pack, version));
+        plugin.log("Sending pack " + pack.getUUID() + " to player " + player.getName());
+        final int version = ProtocolUtil.getProtocolVersion(uuid);
+        final int maxSize = ClientVersion.getMaxSizeForVersion(version);
+        final boolean forceSend = getConfig().getBoolean("Server.force-invalid-size");
+        if (!forceSend && pack.getSize() > maxSize) {
+            if (plugin.debug()) plugin.getLogger().info(String.format("Not sending pack to %s because of excessive size for version %d (%dMB, %dMB).", player.getName(), version, pack.getSize(), maxSize));
+            return;
         }
+
+        plugin.getScheduler().executeOnMain(() -> this.runSetPackTask(player, pack, version));
+
     }
 
     @EventHandler
@@ -281,7 +303,7 @@ public class ResourcePackListener implements Listener {
         }
     }
 
-    private void runSetPackTask(Player player, ResourcePack pack, int version) {
+    public void runSetPackTask(Player player, ResourcePack pack, int version) {
         final UUID uuid = player.getUniqueId();
         AtomicReference<PlatformScheduler.ForcePackTask> task = new AtomicReference<>();
         Runnable packTask = () -> {
