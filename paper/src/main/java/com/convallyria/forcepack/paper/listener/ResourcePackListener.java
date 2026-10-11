@@ -49,7 +49,7 @@ public class ResourcePackListener implements Listener {
     {
         try {
             defaultPackHash = Files.asByteSource(new File(
-                    "/data/plugins/ForcePack/packs/pack.zip"
+                    "/data/plugins/ForcePack/packs/merged.zip"
                 )).hash(Hashing.sha1()).toString();
         } catch (IOException e) {
             throw new RuntimeException(e);
