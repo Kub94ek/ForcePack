@@ -9,7 +9,7 @@ import com.convallyria.forcepack.api.utils.GeyserUtil;
 import com.convallyria.forcepack.paper.ForcePackPaper;
 import com.convallyria.forcepack.paper.event.ForcePackReloadEvent;
 import com.convallyria.forcepack.paper.event.MultiVersionResourcePackStatusEvent;
-import com.convallyria.forcepack.paper.event.ResourcePackLoadedEvent;
+import com.convallyria.forcepack.paper.event.ResourcePackAcceptedEvent;
 import com.convallyria.forcepack.paper.player.ForcePackPaperPlayer;
 import com.convallyria.forcepack.paper.translation.Translations;
 import com.convallyria.forcepack.paper.util.GameProfile;
@@ -118,6 +118,9 @@ public class ResourcePackListener implements Listener {
         switch (status) {
             case ACCEPTED: {
                 sentAccept.put(uuid, System.currentTimeMillis());
+                ensureMainThread(() -> {
+                    Bukkit.getPluginManager().callEvent(new ResourcePackAcceptedEvent(profile, packId));
+                });
                 break;
             }
             case DECLINED: {
@@ -149,7 +152,6 @@ public class ResourcePackListener implements Listener {
                 } else {
                     ensureMainThread(() -> forcePackPlayer.player().ifPresent(player -> {
                         Translations.ACCEPTED.send(player);
-                        Bukkit.getPluginManager().callEvent(new ResourcePackLoadedEvent(profile, packId));
                         boolean sendTitle = plugin.getConfig().getBoolean("send-loading-title");
                         if (sendTitle) player.sendTitle(null, null, 0, 0, 0); // resetTitle doesn't clear subtitle
                     }));

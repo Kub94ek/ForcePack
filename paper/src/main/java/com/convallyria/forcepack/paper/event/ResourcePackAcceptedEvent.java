@@ -7,13 +7,13 @@ import org.jetbrains.annotations.NotNull;
 
 import java.util.UUID;
 
-public class ResourcePackLoadedEvent extends Event {
+public class ResourcePackAcceptedEvent extends Event {
     private static final HandlerList HANDLER_LIST = new HandlerList();
 
     private final GameProfile profile;
     private final UUID id;
 
-    public ResourcePackLoadedEvent(GameProfile profile, UUID id) {
+    public ResourcePackAcceptedEvent(GameProfile profile, UUID id) {
         this.profile = profile;
         this.id = id;
     }
